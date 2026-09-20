@@ -6,7 +6,7 @@ public class Candidato {
     private final String nome;
     private final Cargo cargo;
 
-    public Candidato(int numero, String nome, Cargo cargo) {
+    public Candidato(final int numero, final String nome, final Cargo cargo) {
         this.numero = numero;
         this.nome = nome;
         this.cargo = cargo;

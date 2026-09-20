@@ -34,7 +34,7 @@ public class CanalMensagens {
         try {
             this.socket.close();
         } catch (IOException ignored) {
-            // conexao ja pode estar fechada, nao é um erro relevante aqui
+            // no-op
         }
     }
 

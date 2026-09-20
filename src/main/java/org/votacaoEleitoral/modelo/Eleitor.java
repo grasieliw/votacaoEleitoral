@@ -26,4 +26,11 @@ public class Eleitor {
         return this.getSenha().equals(senha);
     }
 
+    public void votarEm(final Cargo cargo) {
+        this.cargosVotados.add(cargo);
+    }
+
+    public boolean votouEmTodosOsCargos() {
+        return this.cargosVotados.size() == Cargo.values().length;
+    }
 }
