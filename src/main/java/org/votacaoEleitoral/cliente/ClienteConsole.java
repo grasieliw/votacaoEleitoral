@@ -67,14 +67,29 @@ public class ClienteConsole {
 
     private void conduzirVotacao(final Mensagem primeiraMensagem) {
         Mensagem atual = primeiraMensagem;
+        String cargo = "";
 
-        while (atual.getTipo() == TipoMensagem.VOTACAO) {
-            final String cargo = atual.getPayload();
+        // Fix bug: loop saía ao receber VOTACAO_ERRO, desincronizando cliente e servidor
+        while (atual.getTipo() == TipoMensagem.VOTACAO || atual.getTipo() == TipoMensagem.VOTACAO_ERRO) {
 
-            System.out.println("\n== Votação: " + cargo + " ==");
+            if (atual.getTipo() == TipoMensagem.VOTACAO) {
+                cargo = atual.getPayload();
+                System.out.println("\n== Votação: " + cargo + " ==");
+            } else {
+                System.out.println("Erro: " + atual.getPayload() + ". Tente novamente.");
+            }
+
             System.out.print("Número do candidato: ");
 
-            final int numero = Integer.parseInt(teclado.nextLine().trim());
+            int numero;
+            // Fix bug: parseInt sem try/catch travava o programa com entrada não numérica
+            try {
+                numero = Integer.parseInt(teclado.nextLine().trim());
+            } catch (NumberFormatException e) {
+                System.out.println("Digite apenas números.");
+                atual = new Mensagem(TipoMensagem.VOTACAO_ERRO, "Entrada invalida");
+                continue;
+            }
 
             Mensagem respostaVoto = rede.enviarVoto(numero);
 
@@ -82,7 +97,6 @@ public class ClienteConsole {
                 System.out.println(respostaVoto.getPayload());
                 atual = rede.receberProximaMensagem();
             } else {
-                System.out.println("Servidor respondeu: " + respostaVoto.getPayload());
                 atual = respostaVoto;
             }
         }

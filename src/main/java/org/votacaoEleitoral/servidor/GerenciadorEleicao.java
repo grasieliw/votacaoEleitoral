@@ -5,9 +5,16 @@ import org.votacaoEleitoral.modelo.Cargo;
 import org.votacaoEleitoral.modelo.Eleitor;
 
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class GerenciadorEleicao {
 
+    private volatile boolean votacaoAberta = true; // Fix bug: flag compartilhada para controle de tempo entre Threads
+    private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
+
+    private final Set<String> sessoesAtivas = new HashSet<>(); // Fix bug: controle de login duplicado
     private final Map<String, Eleitor> eleitoresPorCpf = new HashMap<>();
     private final Map<Cargo, List<Candidato>> candidatosPorCargo = new EnumMap<>(Cargo.class);
     private final Map<Cargo, Map<Integer, Integer>> votosPorCargo = new EnumMap<>(Cargo.class);
@@ -15,11 +22,31 @@ public class GerenciadorEleicao {
     public GerenciadorEleicao() {
         inicializarEleitoresDeTeste();
         inicializarCandidatosDeTeste();
+        timer.schedule(this::encerrarVotacao, 30, TimeUnit.SECONDS);
     }
 
-    public synchronized boolean autenticar(final String cpf, final String senha) {
+    private void encerrarVotacao (){
+        votacaoAberta = false;
+        timer.shutdown();
+        System.out.println("Tempo esgotado. Votacao encerrada.");
+    }
+
+    public boolean isVotacaoAberta() {
+        return votacaoAberta;
+    }
+
+    public synchronized boolean autenticar
+            (final String cpf, final String senha) {
         Eleitor eleitor = this.eleitoresPorCpf.get(cpf);
         return eleitor != null && eleitor.senhaCorreta(senha);
+    }
+
+    public synchronized boolean registrarSessao(final String cpf){
+        return sessoesAtivas.add(cpf);
+    }
+
+    public synchronized void encerrarSessao(final String cpf){
+        sessoesAtivas.remove(cpf);
     }
 
     public synchronized void registrarVoto(final String cpf, final Cargo cargo, final int numeroCandidato) {
@@ -34,7 +61,17 @@ public class GerenciadorEleicao {
     }
 
     public synchronized Map<Integer, Integer> getResultado(final Cargo cargo) {
-        return new HashMap<>(this.votosPorCargo.get(cargo));
+        // Fix bug: candidatos com zero votos não apareciam — agora itera pela lista de candidatos
+        Map<Integer, Integer> resultado = new HashMap<>();
+        List<Candidato> candidatos = this.candidatosPorCargo.get(cargo);
+
+        for (Candidato candidato : candidatos) {
+            int numero = candidato.getNumero();
+            int votos = this.votosPorCargo.get(cargo).getOrDefault(numero, 0);
+            resultado.put(numero, votos);
+        }
+
+        return resultado;
     }
 
     public synchronized List<Candidato> getCandidatos (final Cargo cargo) {

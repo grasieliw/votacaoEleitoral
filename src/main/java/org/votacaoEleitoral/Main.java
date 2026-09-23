@@ -7,21 +7,26 @@ import java.net.*;
 public class Main {
     public static void main(String[] args) {
         int porta = 8080;
-        long tempoInicio = System.currentTimeMillis();
-        long tempoLimite = 10 * 60 * 1000;
 
         GerenciadorEleicao gerenciador = new GerenciadorEleicao();
 
-        try {
-            ServerSocket serverSocket = new ServerSocket(porta);
+        // Bug fix: try-with-resources garante que o ServerSocket seja fechado ao encerrar
+        try (ServerSocket serverSocket = new ServerSocket(porta)) {
+            // Bug fix: setSoTimeout destrava o accept() a cada 1s para checar isVotacaoAberta()
+            serverSocket.setSoTimeout(1000);
             System.out.println("O servidor foi aberto na porta: " + porta);
 
-            while ((System.currentTimeMillis() - tempoInicio) <= tempoLimite) {
-                Socket socketCliente = serverSocket.accept();
-                ConexaoCliente conexao = new ConexaoCliente(socketCliente, gerenciador);
-                Thread novaThread = new Thread(conexao);
-                novaThread.start();
+            while (gerenciador.isVotacaoAberta()) {
+                try {
+                    Socket socketCliente = serverSocket.accept();
+                    ConexaoCliente conexao = new ConexaoCliente(socketCliente, gerenciador);
+                    new Thread(conexao).start();
+                } catch (SocketTimeoutException e) {
+                    // timeout do accept() — checa isVotacaoAberta() na proxima iteracao do while
+                }
             }
+
+            System.out.println("Servidor encerrado. Votacao finalizada.");
 
         } catch (Exception e) {
             System.out.println("Erro ao abrir o servidor: " + e.getMessage());
