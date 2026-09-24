@@ -11,10 +11,13 @@ import java.util.concurrent.TimeUnit;
 
 public class GerenciadorEleicao {
 
-    private volatile boolean votacaoAberta = true; // Fix bug: flag compartilhada para controle de tempo entre Threads
+    // volatile: visibilidade entre threads, timer e clientes leem o mesmo valor
+    private volatile boolean votacaoAberta = true;
+    // timer: thread agendada para encerrar votação após 10 minutos
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
 
-    private final Set<String> sessoesAtivas = new HashSet<>(); // Fix bug: controle de login duplicado
+    // sessoesAtivas: controle de login duplicado
+    private final Set<String> sessoesAtivas = new HashSet<>();
     private final Map<String, Eleitor> eleitoresPorCpf = new HashMap<>();
     private final Map<Cargo, List<Candidato>> candidatosPorCargo = new EnumMap<>(Cargo.class);
     private final Map<Cargo, Map<Integer, Integer>> votosPorCargo = new EnumMap<>(Cargo.class);
@@ -22,10 +25,10 @@ public class GerenciadorEleicao {
     public GerenciadorEleicao() {
         inicializarEleitoresDeTeste();
         inicializarCandidatosDeTeste();
-        timer.schedule(this::encerrarVotacao, 30, TimeUnit.SECONDS);
+        timer.schedule(this::encerrarVotacao, 10, TimeUnit.MINUTES);
     }
 
-    private void encerrarVotacao (){
+    private void encerrarVotacao() {
         votacaoAberta = false;
         timer.shutdown();
         System.out.println("Tempo esgotado. Votacao encerrada.");
@@ -35,17 +38,17 @@ public class GerenciadorEleicao {
         return votacaoAberta;
     }
 
-    public synchronized boolean autenticar
-            (final String cpf, final String senha) {
+    // synchronized: evita condição de corrida, só uma thread por vez
+    public synchronized boolean autenticar(final String cpf, final String senha) {
         Eleitor eleitor = this.eleitoresPorCpf.get(cpf);
         return eleitor != null && eleitor.senhaCorreta(senha);
     }
 
-    public synchronized boolean registrarSessao(final String cpf){
+    public synchronized boolean registrarSessao(final String cpf) {
         return sessoesAtivas.add(cpf);
     }
 
-    public synchronized void encerrarSessao(final String cpf){
+    public synchronized void encerrarSessao(final String cpf) {
         sessoesAtivas.remove(cpf);
     }
 
@@ -61,7 +64,7 @@ public class GerenciadorEleicao {
     }
 
     public synchronized Map<Integer, Integer> getResultado(final Cargo cargo) {
-        // Fix bug: candidatos com zero votos não apareciam — agora itera pela lista de candidatos
+        // inclui candidatos com zero votos
         Map<Integer, Integer> resultado = new HashMap<>();
         List<Candidato> candidatos = this.candidatosPorCargo.get(cargo);
 
@@ -74,11 +77,9 @@ public class GerenciadorEleicao {
         return resultado;
     }
 
-    public synchronized List<Candidato> getCandidatos (final Cargo cargo) {
+    public synchronized List<Candidato> getCandidatos(final Cargo cargo) {
         return new ArrayList<>(this.candidatosPorCargo.get(cargo));
     }
-
-    // ABAIXO EU DEIXEI DADOS DE TESTE - PODEMOS MELHORAR DEPOIS
 
     private void inicializarEleitoresDeTeste() {
         eleitoresPorCpf.put("login1", new Eleitor("login1", "senha1"));
@@ -147,7 +148,7 @@ public class GerenciadorEleicao {
                     break;
 
                 case DEPUTADO_FEDERAL:
-                    // Candidatos de Esquerda
+                    // Esquerda
                     candidatos.add(new Candidato(1300, "Jonas Reis (PT)", cargo));
                     candidatos.add(new Candidato(1303, "Laura Sito (PT)", cargo));
                     candidatos.add(new Candidato(1313, "Alexandre Lindenmeyer (PT)", cargo));
@@ -158,8 +159,7 @@ public class GerenciadorEleicao {
                     candidatos.add(new Candidato(5012, "John Elvis Braga (PSOL)", cargo));
                     candidatos.add(new Candidato(5050, "Fernanda Melchionna (PSOL)", cargo));
                     candidatos.add(new Candidato(1200, "Afonso Motta (PDT)", cargo));
-
-                    // Candidatos de Direita
+                    // Direita
                     candidatos.add(new Candidato(2210, "Fernanda Barth (PL)", cargo));
                     candidatos.add(new Candidato(2214, "Marcelo Moraes (PL)", cargo));
                     candidatos.add(new Candidato(2221, "Alexandre Bobadra (PL)", cargo));
@@ -173,7 +173,7 @@ public class GerenciadorEleicao {
                     break;
 
                 case DEPUTADO_ESTADUAL:
-                    // Candidatos de Esquerda
+                    // Esquerda
                     candidatos.add(new Candidato(13010, "Alexandre Bublitz (PT)", cargo));
                     candidatos.add(new Candidato(13123, "Eva Valeria Lorenzato (PT)", cargo));
                     candidatos.add(new Candidato(13300, "Ericka Oliveira (PT)", cargo));
@@ -184,8 +184,7 @@ public class GerenciadorEleicao {
                     candidatos.add(new Candidato(50111, "Fabiano Benites (PSOL)", cargo));
                     candidatos.add(new Candidato(50570, "Faby Gomes (PSOL)", cargo));
                     candidatos.add(new Candidato(50777, "Alice Carvalho (PSOL)", cargo));
-
-                    // Candidatos de Direita
+                    // Direita
                     candidatos.add(new Candidato(22000, "Camila Nunes (PL)", cargo));
                     candidatos.add(new Candidato(22044, "Elvis Feltrin (PL)", cargo));
                     candidatos.add(new Candidato(22193, "Felipe Torres (PL)", cargo));

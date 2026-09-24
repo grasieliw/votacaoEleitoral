@@ -11,6 +11,7 @@ import java.io.*;
 import java.util.List;
 import java.util.Map;
 
+// Runnable: cada instância roda em sua própria thread, uma por cliente
 public class ConexaoCliente implements Runnable {
     private final GerenciadorEleicao gerenciador;
     private CanalMensagens canal;
@@ -22,16 +23,15 @@ public class ConexaoCliente implements Runnable {
     }
 
     public void run() {
-
         try {
             if (!autenticar()) {
                 return;
             }
 
-            // Fix bug: loop encerrava apenas com desconexao — agora para quando votacao fechar
+            // loop principal: encerra quando votação fechar
             while (gerenciador.isVotacaoAberta()) {
                 canal.enviar(new Mensagem(TipoMensagem.MENU, "1-Votar,2-Resultados"));
-                Mensagem escolha = canal.receber(); // ESCOLHA|1 ou ESCOLHA|2
+                Mensagem escolha = canal.receber();
 
                 if ("1".equals(escolha.getPayload())) {
                     if (gerenciador.jaVotouEmTudo(cpfLogado)) {
@@ -44,7 +44,6 @@ public class ConexaoCliente implements Runnable {
                 } else if ("2".equals(escolha.getPayload())) {
                     this.processarResultados();
                 } else {
-                    // Fix bug: ESCOLHA_ERRO nunca era enviado — qualquer entrada invalida virava "ver resultados"
                     canal.enviar(new Mensagem(TipoMensagem.ESCOLHA_ERRO, "Opcao invalida"));
                     continue;
                 }
@@ -53,7 +52,7 @@ public class ConexaoCliente implements Runnable {
         } catch (final IOException ex) {
             System.out.println("Cliente " + (cpfLogado != null ? cpfLogado : "?") + " desconectou: " + ex.getMessage());
         } finally {
-            // Fix bug: encerra sessao ao desconectar para liberar CPF para novo login
+            // finally: libera sessão e fecha socket independente do motivo de encerramento
             if (cpfLogado != null) {
                 gerenciador.encerrarSessao(cpfLogado);
             }
@@ -65,6 +64,7 @@ public class ConexaoCliente implements Runnable {
         Mensagem login = canal.receber();
         String[] campos = login.getCampos();
 
+        // valida formato: LOGIN|cpf;senha
         if (campos.length < 2) {
             canal.enviar(new Mensagem(TipoMensagem.LOGIN_ERRO, "Mensagem de login invalida"));
             return false;
@@ -74,7 +74,7 @@ public class ConexaoCliente implements Runnable {
         String senha = campos[1];
 
         if (gerenciador.autenticar(cpf, senha)) {
-            // Fix bug: impede login duplicado — registrarSessao retorna false se CPF ja esta em uso
+            // controle de sessão: impede login duplicado
             if (gerenciador.registrarSessao(cpf)) {
                 this.cpfLogado = cpf;
                 canal.enviar(new Mensagem(TipoMensagem.LOGIN_OK, "Usuario autenticado"));
@@ -87,15 +87,14 @@ public class ConexaoCliente implements Runnable {
             canal.enviar(new Mensagem(TipoMensagem.LOGIN_ERRO, "Login ou senha invalidos"));
             return false;
         }
-
     }
 
     private void processarVotacao() throws IOException {
-        // Fix bug: verifica se votacao ainda esta aberta antes de processar
         if (!gerenciador.isVotacaoAberta()) {
             canal.enviar(new Mensagem(TipoMensagem.JA_VOTOU, "Votacao encerrada. Tempo esgotado."));
             return;
         }
+        // requisição-resposta: servidor envia cargo, cliente responde com número
         for (Cargo cargo : Cargo.values()) {
             canal.enviar(new Mensagem(TipoMensagem.VOTACAO, cargo.name()));
             boolean votoValido = false;
@@ -103,7 +102,6 @@ public class ConexaoCliente implements Runnable {
             while (!votoValido) {
                 Mensagem voto = canal.receber();
                 int numeroCandidato;
-                // Fix bug: parseInt sem try/catch derrubava a Thread com entrada nao numerica
                 try {
                     numeroCandidato = Integer.parseInt(voto.getPayload().trim());
                 } catch (NumberFormatException e) {
@@ -121,9 +119,7 @@ public class ConexaoCliente implements Runnable {
                 } else {
                     canal.enviar(new Mensagem(TipoMensagem.VOTACAO_ERRO, "Candidato nao encontrado"));
                 }
-
             }
-
         }
 
         canal.enviar(new Mensagem(TipoMensagem.VOTACAO_CONCLUIDA, "Votacao concluida com sucesso!"));
@@ -139,11 +135,9 @@ public class ConexaoCliente implements Runnable {
 
     private void enviarResultadoCompleto() {
         for (Cargo cargo : Cargo.values()) {
-
             Map<Integer, Integer> resultado = gerenciador.getResultado(cargo);
             StringBuilder payload = new StringBuilder(cargo.name());
             resultado.forEach((numero, votos) -> payload.append(";").append(numero).append("=").append(votos));
-
             canal.enviar(new Mensagem(TipoMensagem.RESULTADO, payload.toString()));
         }
     }

@@ -10,19 +10,20 @@ public class Main {
 
         GerenciadorEleicao gerenciador = new GerenciadorEleicao();
 
-        // Bug fix: try-with-resources garante que o ServerSocket seja fechado ao encerrar
+        // ServerSocket: escuta conexões na porta 8080
         try (ServerSocket serverSocket = new ServerSocket(porta)) {
-            // Bug fix: setSoTimeout destrava o accept() a cada 1s para checar isVotacaoAberta()
+            // setSoTimeout: destrava accept() periodicamente para checar fim da votação
             serverSocket.setSoTimeout(1000);
             System.out.println("O servidor foi aberto na porta: " + porta);
 
+            // servidor concorrente: cada cliente ganha sua própria thread
             while (gerenciador.isVotacaoAberta()) {
                 try {
                     Socket socketCliente = serverSocket.accept();
                     ConexaoCliente conexao = new ConexaoCliente(socketCliente, gerenciador);
                     new Thread(conexao).start();
                 } catch (SocketTimeoutException e) {
-                    // timeout do accept() — checa isVotacaoAberta() na proxima iteracao do while
+                    // destrava accept(), volta ao while para checar isVotacaoAberta()
                 }
             }
 

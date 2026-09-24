@@ -22,6 +22,7 @@ public class ClienteConsole {
             return;
         }
 
+        // loop principal: requisição-resposta com o servidor
         while (true) {
             final Mensagem menu = rede.receberProximaMensagem();
 
@@ -69,7 +70,7 @@ public class ClienteConsole {
         Mensagem atual = primeiraMensagem;
         String cargo = "";
 
-        // Fix bug: loop saía ao receber VOTACAO_ERRO, desincronizando cliente e servidor
+        // loop de votação: VOTACAO_ERRO mantém o loop sem desincronizar cliente/servidor
         while (atual.getTipo() == TipoMensagem.VOTACAO || atual.getTipo() == TipoMensagem.VOTACAO_ERRO) {
 
             if (atual.getTipo() == TipoMensagem.VOTACAO) {
@@ -82,7 +83,6 @@ public class ClienteConsole {
             System.out.print("Número do candidato: ");
 
             int numero;
-            // Fix bug: parseInt sem try/catch travava o programa com entrada não numérica
             try {
                 numero = Integer.parseInt(teclado.nextLine().trim());
             } catch (NumberFormatException e) {
